@@ -1,6 +1,6 @@
 # _Web Scraping_ #
 
-This is a python script that scrapes data from the vrbo vacation rental service and stores it in a MySQL database.
+A python script that scrapes data from the vrbo vacation rental service and stores it in a MySQL database.
 
 ## Prerequisite ##
 
@@ -17,6 +17,6 @@ CREATE TABLE `family_friendly_rentals` ( `id` INT NOT NULL AUTO_INCREMENT , `Tit
 
 - Run script
 
-```
+```sh
 python3 webScraping.py
 ```

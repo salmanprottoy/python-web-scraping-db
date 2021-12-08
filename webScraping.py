@@ -1,41 +1,15 @@
-from urllib.request import Request
-from urllib.request import urlopen
-from urllib.parse import urlencode
+import re
 from html.parser import HTMLParser
+import urllib.request
 import mysql.connector
+from mysql.connector import Error
 
 
-def get(url, payload, headers):
-    payload = urlencode(payload)
-    url = url + "?" + payload
-    try:
-        request = Request(url=url, headers=headers, method="GET")
-        response = urlopen(request)
-        return response.read().decode('utf-8')
-    except Exception as e:
-        print("Request error:", e)
-        return "no content available!"
-
-
-def post(url, payload, headers):
-    payload = urlencode(payload)
-    try:
-        request = Request(url=url, data=payload.encode(),
-                          headers=headers, method='POST')
-        response = urlopen(request)
-        return response.read().decode('utf-8')
-    except Exception as e:
-        print("Request error", e)
-        return "no content available"
-
-
-html = get(url="https://www.vrbo.com/vacation-rentals/family/canada/british-columbia",
-           payload={},
-           headers={
-               "User-Agent":	"Mozilla/5.0 (X11 Ubuntu Linux x86_64 rv: 94.0) Gecko/20100101 Firefox/94.0",
-           }
-           )
-# print(res)
+location = "https://www.vrbo.com/vacation-rentals/family/canada/british-columbia"
+url = urllib.request.urlopen(
+    "https://www.vrbo.com/vacation-rentals/family/canada/british-columbia")
+html = url.read().decode()
+url.close()
 
 
 class WebParser(HTMLParser):
@@ -143,49 +117,104 @@ def find(content, query):
     return parser.results
 
 
-# data extraction logic
 HotelName = find(content=html, query=[
     'div', ('class', 'CommonRatioCard__description'), 'text'])
 WebParser.results = []
+
 Facilites = find(content=html, query=[
     'div', ('class', 'CommonRatioCard__subcaption'), 'text'])
 WebParser.results = []
+
 Price = find(content=html, query=[
     'span', ('class', 'CommonRatioCard__price__amount'), 'text'])
 WebParser.results = []
+
 Image = find(content=html, query=[
-    'span', ('class', 'ListingsRatioCard__img'), 'text'])
+    'script', (), 'text'])
 WebParser.results = []
-# CardCarousel__placeholderImage
-# ListingsRatioCard__img
 
-# loop over all items
-print("Titles: \n")
-for index in range(0, len(HotelName)):
-    # write line
-    print(HotelName[index], "\n")
-#print("\n", len(HotelName), "\n")
-print("Facilities: \n")
+location = location[52:59]+" "+location[60:68]+", "+location[45:51]
+
+all_facilitites = []
 for index in range(0, len(Facilites)):
-    # write line
-    print(Facilites[index], "\n")
-#print("\n", len(Facilites), "\n")
-print("Price: \n")
-for index in range(0, len(Price)):
-    # write line
-    print(Price[index], "\n")
-#print("\n", len(Price), "\n")
-print("Image: \n")
-for index in range(0, len(Image)):
-    # write line
-    print(Image[index], "\n")
+    all_facilitites.append(Facilites[index].split(" · "))
 
-# db connection
-mydb = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="",
-    database='test',
-)
-if mydb.is_connected():
-    print("connected successfully!")
+for index in range(0, len(all_facilitites)):
+    if(len(all_facilitites[index]) < 3):
+        temp = all_facilitites[index]
+        temp.append('None')
+        all_facilitites[index] = temp
+
+for index in range(0, len(Image)):
+    if(Image[index].startswith('window.__PRELOADED_STATE__ ')):
+        Image = Image[index]
+
+
+list_match_img_url1 = re.findall(
+    r'"tripleId":(.*?),"thumbnailUrl":(.*?),', Image)
+'''for i in list_match_img[-6:]:
+    print(i, "\n")'''
+list_match_img_url2 = re.findall(
+    r'"tripleId":(.*?),"thumbnailUrl2":(.*?),', Image)
+list_match_img_url3 = re.findall(
+    r'"tripleId":(.*?),"thumbnailUrl3":(.*?),', Image)
+
+
+matched_img1 = list_match_img_url1[-6:]
+matched_img2 = list_match_img_url2[-6:]
+matched_img3 = list_match_img_url3[-6:]
+
+collapse_img = []
+for i in range(len(matched_img1)):
+    collapse_img.append([matched_img1[i][1],
+                         matched_img2[i][1], matched_img3[i][1]])
+
+
+all_information = []
+print("\n\n\n")
+for i in range(0, len(HotelName)):
+    all_information.append([HotelName[i], location, all_facilitites[i],
+                            Price[i], collapse_img[i]])
+
+
+''' for i in all_information:
+    print(i, "\n")
+ '''
+
+def insert_into_mysql_database(titile, location, sleeps, bedroom, bathroom, image_1, image_2, image_3, pirce):
+    try:
+        mydb_connection = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="",
+            database='test',
+        )
+        cursor = mydb_connection.cursor()
+        query = """INSERT INTO family_friendly_rentals (Title, Location, Sleeps, Bedroom, Bathroom, Image1, Image2, Image3, Price) 
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) """
+        record = (titile, location, sleeps, bedroom, bathroom,
+                  image_1, image_2, image_3, pirce)
+        cursor.execute(query, record)
+        mydb_connection.commit()
+        print("Inserted Successfully")
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+    finally:
+        if mydb_connection.is_connected():
+            cursor.close()
+            mydb_connection.close()
+            print("MySQL connection is closed")
+
+
+for info in all_information:
+    insert_into_mysql_database(info[0],
+                               info[1],
+                               info[2][0],
+                               info[2][1],
+                               info[2][2],
+                               info[4][0],
+                               info[4][1],
+                               info[4][2],
+                               info[3])

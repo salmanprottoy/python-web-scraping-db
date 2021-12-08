@@ -181,7 +181,8 @@ for i in range(0, len(HotelName)):
     print(i, "\n")
  '''
 
-def insert_into_mysql_database(titile, location, sleeps, bedroom, bathroom, image_1, image_2, image_3, pirce):
+
+def insert_into_mysql_database(title, location, sleeps, bedroom, bathroom, image_1, image_2, image_3, price):
     try:
         mydb_connection = mysql.connector.connect(
             host="localhost",
@@ -192,8 +193,8 @@ def insert_into_mysql_database(titile, location, sleeps, bedroom, bathroom, imag
         cursor = mydb_connection.cursor()
         query = """INSERT INTO family_friendly_rentals (Title, Location, Sleeps, Bedroom, Bathroom, Image1, Image2, Image3, Price) 
                                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) """
-        record = (titile, location, sleeps, bedroom, bathroom,
-                  image_1, image_2, image_3, pirce)
+        record = (title, location, sleeps, bedroom, bathroom,
+                  image_1, image_2, image_3, price)
         cursor.execute(query, record)
         mydb_connection.commit()
         print("Inserted Successfully")
